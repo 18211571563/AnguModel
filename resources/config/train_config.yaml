@@ -1,0 +1,13 @@
+# train_config.yaml
+hardware:
+  device: "cuda"
+  use_flash_attention: true  # 7800XT 实验特性开启
+
+data:
+  local_path: "/home/georgy/model/data/train_data"
+  max_length: 256            # TinyStories 的最佳长度
+
+training:
+  epochs: 5
+  batch_size: 16             # 7800XT 16G显存测试安全边界
+  learning_rate: 1e-3        # 预训练学习率
