@@ -1,0 +1,13 @@
+{
+  "model_type": "my_llama_moe",
+  "vocab_size": 50304,
+  "dim": 512,
+  "hidden_dim": 1376,
+  "layer_num": 4,
+  "heads_num": 8,
+  "max_seq_len": 1024,
+  "pad_token_id": 0,
+  "eos_token_id": 2,
+  "num_experts": 8,
+  "num_experts_per_tok": 2
+}

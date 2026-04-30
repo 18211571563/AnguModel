@@ -4,10 +4,11 @@ hardware:
   use_flash_attention: true  # 7800XT 实验特性开启
 
 data:
-  local_path: "/home/georgy/model/data/train_data"
+  local_data_path: "/home/georgy/model/data/train_data/TinyStories"
   max_length: 256            # TinyStories 的最佳长度
+  load_data_size: 5000
 
 training:
-  epochs: 5
+  epochs: 1
   batch_size: 16             # 7800XT 16G显存测试安全边界
-  learning_rate: 1e-3        # 预训练学习率
+  learning_rate: 5.0e-4        # 预训练学习率 - 注意这里的 .0，这是关键！这样 YAML 会知道这是个浮点数
