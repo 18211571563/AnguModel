@@ -62,8 +62,8 @@ class RotaryEmbedding(nn.Module):
     def apply_rotary_emb(q, k, cos, sin):
         """应用旋转位置编码"""
         # 调整 cos/sin 形状以匹配 [batch, heads, seq, head_dim]
-        cos = cos.unsqueeze(0).unsqueeze(1)
-        sin = sin.unsqueeze(0).unsqueeze(1)
+        cos = cos.unsqueeze(1)
+        sin = sin.unsqueeze(1)
         q_rot = (q * cos) + (RotaryEmbedding.rotate_half(q) * sin)
         k_rot = (k * cos) + (RotaryEmbedding.rotate_half(k) * sin)
         return q_rot, k_rot

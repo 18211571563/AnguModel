@@ -79,13 +79,13 @@ input_ids_full = inputs["input_ids"].to(device)
 x = input_ids_full[:, :-1]      # x 是前 N-1 个词
 y = input_ids_full[:, 1:]       # targets 是后 N-1 个词
 '''
-dataloader:DataLoader= TinyStoriesDataSetProcess.process(tokenizer,local_data_path = local_data_path, max_length=max_length, batch_size=batch_size, load_data_size=load_data_size)
+dataloader:DataLoader= TinyStoriesDataSetProcess.process(tokenizer,local_data_path = local_data_path, max_length=max_length, batch_size=batch_size, load_data_size=(load_data_size if load_data_size != -1 else None))
 
 # ---------------------------------------------------------
 # 4. 加载模型阶段
 # ---------------------------------------------------------
 print("⏳ 加载模型阶段 - 开始...")
-model = AnguModel(config).to(dtype=torch.float16, device=device)
+model = AnguModel(config).to(dtype=torch.bfloat16, device=device)
 if os.path.exists(model_save_path):
     print(f"🔄 加载模型阶段 - 发现预训练权重 '{model_save_path}'，正在加载...")
     model.load_state_dict(torch.load(model_save_path))
@@ -94,7 +94,6 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
 model.train()
 print("✅ 加载模型阶段 - 模型加载完毕！")
-
 
 # ---------------------------------------------------------
 # 5. 实际训练阶段
