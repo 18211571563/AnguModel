@@ -31,9 +31,26 @@ class AnguModel(nn.Module):
         self.lm_norm = RMSNorm(self.config.dim)
 
 
-    def forward(self, input_ids: torch.Tensor, kv_cache_batch:KvCacheBatch = None, batch_seq_ids = None):
+    def forward(self, input_ids: torch.Tensor, kv_cache_batch:KvCacheBatch = None, batch_seq_ids = None, position_ids: torch.Tensor = None):
+        batch_size, seq_len = input_ids.shape
+
+        # 🌟 改进2：内部兜底计算。如果外面没传 position_ids，我们就在这里算好！
+        # 这样底层的网络就彻底和 KV Cache 长度解耦了
+        if position_ids is None:
+            past_seq_len = 0
+            if kv_cache_batch is not None and batch_seq_ids is not None:
+                past_seq_lens = kv_cache_batch.get_kv_cache(0).get_seq_len_for_kv_cache(batch_seq_ids)
+                past_seq_len = past_seq_lens[0] if len(past_seq_lens) > 0 else 0
+            
+            # 生成标准的连续号码牌，例如 [10, 11, 12...]
+            # 形状: [batch_size, seq_len]
+            position_ids = torch.arange(
+                past_seq_len, past_seq_len + seq_len, 
+                dtype=torch.long, device=input_ids.device
+            ).unsqueeze(0).expand(batch_size, -1)
+        
         x = self.tok_embeddings(input_ids)
-        x, total_aux_loss = self.swiGluLayer(x, kv_cache_batch, batch_seq_ids)
+        x, total_aux_loss = self.swiGluLayer(x, kv_cache_batch, batch_seq_ids, position_ids)
         return self.lm_head(self.lm_norm(x)), total_aux_loss
 
 
