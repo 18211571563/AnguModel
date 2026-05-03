@@ -65,9 +65,22 @@ class SwiGluLayer(nn.Module):
             SwiGluBlock(dim, hidden_dim, head_num, expert_num, shared_num, top_k) for _ in range(layer_num)
         ])
 
-    def forward(self, x, kv_cache_batch:KvCacheBatch, batch_seq_ids):
+    def forward(self, x, kv_cache_batch:KvCacheBatch, batch_seq_ids, position_ids: torch.Tensor = None):
         batch, seq_len, dim = x.shape
 
+        # ---------------------------------------------------------
+        # 🌟 改进4：极其优雅的解耦方式！直接根据 position_ids 获取角度
+        # ---------------------------------------------------------
+        # 不再查询 KV Cache！我们直接看号码牌里最大的数字是多少
+        max_pos = position_ids.max().item() + 1
+        full_cos, full_sin = self.rope(max_pos) # [max_pos, head_dim/2]
+
+        # 像查字典（Embedding）一样，直接用号码牌把对应的 cos 和 sin 拔出来！
+        # 结果 cos 的形状是：[batch, seq_len, head_dim/2]
+        cos = F.embedding(position_ids, full_cos)
+        sin = F.embedding(position_ids, full_sin)
+
+        '''
         # ---------------------------------------------------------
         # 🌟 GQA 🌟 从类中动态获取 cos 和 sin -> 使用kv cache的代码，导致seq_len默认都是1，需要加上历史长度
         # ---------------------------------------------------------
@@ -83,6 +96,7 @@ class SwiGluLayer(nn.Module):
         # ！！！仅仅切片出【当前正在输入的这几个字】对应的角度 ！！！
         cos = full_cos[past_seq_len: total_seq_len]
         sin = full_sin[past_seq_len: total_seq_len]
+        '''
 
         # Meo： 网关损失函数对外传递
         total_aux_loss = 0.0  # 🌟 准备一个总账本
