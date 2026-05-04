@@ -5,12 +5,28 @@ from transformers import AutoTokenizer
 from transformers import GPTNeoXTokenizer
 from llm.model.AnguModel import AnguModel
 from llm.generate.TokenGenerateStrategy import TokenGenerateStrategy
-from llm.common.config.Config import Config
+from llm.common.config.ModelConfig import ModelConfig
 from llm.model.layer.KvCache import KvCacheBatch
+import yaml
 
 
 # ---------------------------------------------------------
-# 1. 准备阶段 - 读取tokenizer
+# 1. 准备阶段 - 配置
+# ---------------------------------------------------------
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# 🌟 加载模型配置
+model_config:ModelConfig = ModelConfig.from_pretrained("../../resources/config/model_config.json")
+
+# 🌟 加载训练配置
+with open("../../resources/config/train_config.yaml", "r") as f:
+    train_cfg = yaml.safe_load(f)
+
+model_save_path = train_cfg["pth"]["model_save_path"]
+temperature = train_cfg["generate"]["temperature"]
+top_p = train_cfg["generate"]["top_p"]
+
+# ---------------------------------------------------------
+# 2. 准备阶段 - tokenizer
 # ---------------------------------------------------------
 local_tokenizer_path = r"/home/georgy/model/tokenizer/gpt-neox-20b"
 tokenizer:GPTNeoXTokenizer = AutoTokenizer.from_pretrained(local_tokenizer_path)
@@ -20,22 +36,6 @@ if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 
 tokenizer.padding_side = "left"
-
-vocab_size = len(tokenizer)
-
-# ---------------------------------------------------------
-# 2. 准备阶段 - 配置
-# ---------------------------------------------------------
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# 加载模型配置
-config_path = "../../resources/config/model_config.json"
-config:Config = Config.from_pretrained(config_path)
-
-temperature = 0.8
-top_p = 0.9
-
-model_save_path = "../../resources/pth/my_mini_llm.pth"
-
 
 # ---------------------------------------------------------
 # 3. 准备训练数据
@@ -58,9 +58,6 @@ x = input_ids
 # 这是为了防止模型“发疯”（比如陷入死循环一直不输出 [SEP]），这叫“安全刹车”。
 max_generate_length = 100
 
-#cls_token_id = tokenizer.convert_tokens_to_ids("[CLS]")
-#sep_token_id = tokenizer.convert_tokens_to_ids("[SEP]")
-#pad_token_id = tokenizer.convert_tokens_to_ids("[PAD]")
 pad_token_id = tokenizer.pad_token_id
 eos_token_id = tokenizer.eos_token_id
 print("pad_token_id:", pad_token_id)
@@ -70,9 +67,9 @@ current_token_id = x
 generate_token_id = x
 
 # kv cache
+kv_cache_batch = KvCacheBatch(1024, 16, model_config.head_num // 4, model_config.dim // model_config.head_num, device)
 batch_size = input_ids.shape[0]
 batch_seq_ids = [1000 + i for i in range(batch_size)] # 比如 [1000, 1001, 1002...]
-kv_cache_batch = KvCacheBatch(1024, 16, config.head_num // 4, config.dim // config.head_num, device)
 
 batch_size = current_token_id.shape[0]
 unfinished_sequences = torch.ones(batch_size, dtype=torch.bool, device=device) # 定义每行初始化都是 True
@@ -82,7 +79,7 @@ unfinished_sequences = torch.ones(batch_size, dtype=torch.bool, device=device) #
 # 4. 加载模型阶段
 # ---------------------------------------------------------
 print("⏳ 加载模型阶段 - 开始...")
-model = AnguModel(config).to(dtype=torch.float16, device=device)
+model = AnguModel(model_config).to(dtype=torch.float16, device=device)
 if os.path.exists(model_save_path):
     print(f"🔄 加载模型阶段 - 发现预训练权重 '{model_save_path}'，正在加载...")
     model.load_state_dict(torch.load(model_save_path))

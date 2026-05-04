@@ -2,17 +2,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from llm.model.layer.KvCache import KvCache
 from llm.model.layer.KvCache import KvCacheBatch
 from llm.model.layer.MoeSwiGlu import MoeSwiGlu
 from llm.model.layer.RMSNorm import RMSNorm
 from llm.model.layer.Attention import Attention
 from llm.model.layer.Rope import RotaryEmbedding
-from llm.common.config.Config import Config
+from llm.common.config.ModelConfig import ModelConfig
 
 
 class AnguModel(nn.Module):
-    def __init__(self, config: Config):
+    def __init__(self, config: ModelConfig):
         super().__init__()
         self.config = config
         self.tok_embeddings = nn.Embedding(self.config.vocab_size, self.config.dim)
@@ -35,7 +34,7 @@ class AnguModel(nn.Module):
     def forward(self, input_ids: torch.Tensor, kv_cache_batch:KvCacheBatch = None, batch_seq_ids = None, position_ids: torch.Tensor = None):
         batch_size, seq_len = input_ids.shape
 
-        # 🌟 改进2：内部兜底计算。如果外面没传 position_ids，我们就在这里算好！
+        # 🌟 如果外面没传 position_ids，我们就在这里算好！
         # 这样底层的网络就彻底和 KV Cache 长度解耦了
         if position_ids is None:
             past_seq_len = 0
@@ -70,7 +69,7 @@ class SwiGluLayer(nn.Module):
         batch, seq_len, dim = x.shape
 
         # ---------------------------------------------------------
-        # 🌟 改进4：极其优雅的解耦方式！直接根据 position_ids 获取角度
+        # 🌟 直接根据 position_ids 获取角度
         # ---------------------------------------------------------
         # 不再查询 KV Cache！我们直接看号码牌里最大的数字是多少
         max_pos = position_ids.max().item() + 1

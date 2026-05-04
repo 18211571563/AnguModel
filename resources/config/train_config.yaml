@@ -12,3 +12,10 @@ training:
   epochs: 1
   batch_size: 16             # 7800XT 16G显存测试安全边界
   learning_rate: 5.0e-4        # 预训练学习率 - 注意这里的 .0，这是关键！这样 YAML 会知道这是个浮点数
+
+generate:
+  temperature: 0.8
+  top_p: 0.9
+
+pth:
+  model_save_path: "../../resources/pth/my_mini_llm.pth"

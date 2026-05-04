@@ -2,7 +2,7 @@ import json
 import os
 
 
-class Config:
+class ModelConfig:
     def __init__(self, **kwargs):
         # 1. 设置默认值（兜底机制，防止 JSON 里漏写）
         self.model_type = "my_llama_moe"
@@ -43,7 +43,7 @@ class Config:
         前沿规范：提供将当前内存中的配置保存回硬盘的方法
         """
         os.makedirs(save_dir, exist_ok=True)
-        save_path = os.path.join(save_dir, "config.json")
+        save_path = os.path.join(save_dir, "model_config.json")
         with open(save_path, "w", encoding="utf-8") as f:
             # vars(self) 将对象的属性转换为字典
             json.dump(vars(self), f, indent=4, ensure_ascii=False)
