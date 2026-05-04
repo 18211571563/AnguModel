@@ -93,8 +93,8 @@ class KVCacheManager:
 
         # 🌟 1. 预先开辟物理显存池 (固定大小，不再动态申请)
         # 形状: [max_blocks, num_kv_heads, block_size, head_dim]
-        self.k_pool = torch.zeros((max_blocks, kv_head_num, block_size, head_dim), dtype=torch.float16, device=device)
-        self.v_pool = torch.zeros((max_blocks, kv_head_num, block_size, head_dim), dtype=torch.float16, device=device)
+        self.k_pool = torch.zeros((max_blocks, kv_head_num, block_size, head_dim), dtype=torch.bfloat16, device=device)
+        self.v_pool = torch.zeros((max_blocks, kv_head_num, block_size, head_dim), dtype=torch.bfloat16, device=device)
 
         # 🌟 2. 状态管理
         self.free_blocks = list(range(max_blocks))[::-1]  # 空闲块栈

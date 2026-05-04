@@ -102,6 +102,10 @@ for epoch in range(epochs):
         loss = F.cross_entropy(logits.reshape(-1, model_config.vocab_size), y.reshape(-1), ignore_index=tokenizer.pad_token_id)
         loss = loss + aux_loss # 总 Loss = 主线 Loss + MoE 辅助罚款
         loss.backward()
+
+        # 🌟 关键：防止梯度爆炸，大模型训练标配
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
         optimizer.step()
 
         epoch_loss += loss.item()

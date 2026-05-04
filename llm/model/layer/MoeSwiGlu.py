@@ -15,6 +15,8 @@ class MoeSwiGlu(nn.Module):
 
         if shared_num > 0:
             self.shared_experts = Expert(dim, hidden_dim * shared_num)
+            # 增加一个控制共享专家能量的门控或标量（初始化为 1.0）
+            self.shared_gate = nn.Parameter(torch.ones(1))
         else:
             self.shared_experts = None
 
@@ -27,7 +29,7 @@ class MoeSwiGlu(nn.Module):
         # 二, 共享专家
         # ==========================================================
         if self.shared_experts is not None:
-            shared_output = self.shared_experts(x)
+            shared_output = self.shared_experts(x) * self.shared_gate
         else:
             shared_output = 0
 

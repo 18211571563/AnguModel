@@ -74,12 +74,16 @@ batch_seq_ids = [1000 + i for i in range(batch_size)] # 比如 [1000, 1001, 1002
 batch_size = current_token_id.shape[0]
 unfinished_sequences = torch.ones(batch_size, dtype=torch.bool, device=device) # 定义每行初始化都是 True
 
+# =========================================================
+# 🌟 核心准备：记录初始 Prompt 的真实长度，用于后续推算号码牌
+# =========================================================
+initial_seq_len = current_token_id.shape[1]
 
 # ---------------------------------------------------------
 # 4. 加载模型阶段
 # ---------------------------------------------------------
 print("⏳ 加载模型阶段 - 开始...")
-model = AnguModel(model_config).to(dtype=torch.float16, device=device)
+model = AnguModel(model_config).to(dtype=torch.bfloat16, device=device)
 if os.path.exists(model_save_path):
     print(f"🔄 加载模型阶段 - 发现预训练权重 '{model_save_path}'，正在加载...")
     model.load_state_dict(torch.load(model_save_path))
@@ -95,7 +99,24 @@ print("✅ 加载模型阶段 - 模型加载完毕！")
 # ---------------------------------------------------------
 for step in range(61):
     with torch.no_grad():
-        logits, _ = model(generate_token_id, kv_cache_batch, batch_seq_ids)  # [batch, seq_len, vocab_size]
+        # ---------------------------------------------------------
+        # 🌟 新增：动态计算当前轮次的 position_ids
+        # ---------------------------------------------------------
+        if step == 0:
+            # 第一次循环 (Prefill)：处理完整的 prompt
+            # 给每个 token 发 0 到 initial_seq_len-1 的绝对位置号码牌
+            position_ids = torch.arange(
+                0, initial_seq_len, dtype=torch.long, device=device
+            ).unsqueeze(0).expand(batch_size, -1)
+        else:
+            # 第二次及以后的循环 (Decode)：每次只处理刚生成的 1 个新 token
+            # 这 1 个 token 的绝对位置就是：初始长度 + 已经走过的步数 - 1
+            current_pos = initial_seq_len + step - 1
+            position_ids = torch.full(
+                (batch_size, 1), current_pos, dtype=torch.long, device=device
+            )
+
+        logits, _ = model(generate_token_id, kv_cache_batch, batch_seq_ids, position_ids)  # [batch, seq_len, vocab_size]
         last_step_logits = logits[:, -1, :]                 # [batch, vocab_size]
 
         # token处理 -> 主要基于模型计算出来的每行对应的下个词的概率信息，如何取下个词
