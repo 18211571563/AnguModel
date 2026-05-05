@@ -30,6 +30,12 @@ class AnguModel(nn.Module):
         self.lm_head = nn.Linear(self.config.dim, self.config.vocab_size, bias=False)
         self.lm_norm = RMSNorm(self.config.dim)
 
+        # weight tying: 让入口和出口用同一个矩阵
+        # 好处：收敛的更快+节约显存
+        # 不用weight tying理由：入口的初始维度信息和最后输出的维度信息，虽然大小一致，但是所代表的意义不一样，我觉得完全无法匹对
+        #self.lm_head.weight = self.tok_embeddings.weight
+
+
 
     def forward(self, input_ids: torch.Tensor, kv_cache_batch:KvCacheBatch = None, batch_seq_ids = None, position_ids: torch.Tensor = None):
         batch_size, seq_len = input_ids.shape

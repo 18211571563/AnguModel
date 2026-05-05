@@ -5,6 +5,7 @@ from llm.model.layer.RMSNorm import RMSNorm
 from torch.nn.attention import sdpa_kernel, SDPBackend
 from llm.model.layer.Rope import RotaryEmbedding
 from llm.model.layer.KvCache import KvCache
+import math
 
 
 class Attention(nn.Module):
@@ -53,9 +54,11 @@ class Attention(nn.Module):
         v = Attention.repeat_kv(v, self.kv_group_num)
 
         # flashAttention
+        scale_factor = 1.0 if isinstance(self.q_norm, RMSNorm) else (1.0 / math.sqrt(self.head_dim))
+
         if seq_len == 1:
             with sdpa_kernel([SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH]):
-                context = F.scaled_dot_product_attention(q, k, v, is_causal=False)
+                context = F.scaled_dot_product_attention(q, k, v, scale=scale_factor, is_causal=False)
         else:
             # 走到这里，说明是多于 1 个 Token 一起进入网络 (比如首轮 Prompt 或多轮对话追加)
             kv_seq_len = k.shape[2]
@@ -63,7 +66,7 @@ class Attention(nn.Module):
             if seq_len == kv_seq_len:
                 # 只有 Q 和 K 长度完全一样时，用内置的 is_causal 才最安全
                 with sdpa_kernel([SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH]):
-                    context = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+                    context = F.scaled_dot_product_attention(q, k, v, scale=scale_factor, is_causal=True)
             else:
                 # 💥 长度不一样！必须手写长方形 Mask 喂给 math 后端，FlashAttention 处理不了长方形的 causal
                 mask = torch.full((seq_len, kv_seq_len), float('-inf'), device=x.device)
@@ -71,7 +74,7 @@ class Attention(nn.Module):
 
                 # ⚠️ 注意：带有自定义 Mask 时，很多老版本的 FlashAttention 不支持，会退化到 MATH
                 with sdpa_kernel([SDPBackend.MATH]):
-                    context = F.scaled_dot_product_attention(q, k, v, attn_mask=mask)
+                    context = F.scaled_dot_product_attention(q, k, v, scale=scale_factor, attn_mask=mask)
 
 
 

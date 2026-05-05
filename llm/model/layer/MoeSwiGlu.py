@@ -54,7 +54,7 @@ class MoeSwiGlu(nn.Module):
             # 用 one_hot 搞出形状为 [batch*seq_len, top_k, expert_num] 的张量
             mask = F.one_hot(selected_experts, num_classes=self.expert_num).float()
             # 在 batch 维度求均值，得到真实被分配的频率
-            f_i = mask.sum(dim=1).mean(dim=0)
+            f_i = mask.sum(dim=1).mean(dim=0) / self.top_k  # 🌟 关键：除以 top_k 归一化
             # 公式：expert_num * sum(P_i * f_i)
             # alpha 系数设为 0.01 (可调超参)
             bal_loss = torch.sum(p_i * f_i) * self.expert_num * 0.01

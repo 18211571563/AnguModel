@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from llm.common.config.ModelConfig import ModelConfig
 import yaml
+from transformers import get_cosine_schedule_with_warmup
 
 
 # ---------------------------------------------------------
@@ -70,6 +71,11 @@ if os.path.exists(model_save_path):
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
+# 学习率调度器（LR Scheduler）
+total_steps = len(dataloader) * epochs
+warmup_steps = int(0.1 * total_steps) # 前 10% 步数用于预热
+scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
+
 model.train()
 print("✅ 加载模型阶段 - 模型加载完毕！")
 
@@ -107,6 +113,7 @@ for epoch in range(epochs):
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
         optimizer.step()
+        scheduler.step()  # 🌟 更新学习率
 
         epoch_loss += loss.item()
 
