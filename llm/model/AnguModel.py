@@ -6,8 +6,9 @@ from llm.model.layer.KvCache import KvCacheBatch
 from llm.model.layer.MoeSwiGlu import MoeSwiGlu
 from llm.model.layer.RMSNorm import RMSNorm
 from llm.model.layer.Attention import Attention
-from llm.model.layer.Rope import RotaryEmbedding
+from llm.model.layer.rope.Rope import RotaryEmbedding
 from llm.common.config.ModelConfig import ModelConfig
+from llm.model.init.ParamInitializer import ParamInitializer
 
 
 class AnguModel(nn.Module):
@@ -35,6 +36,13 @@ class AnguModel(nn.Module):
         # 不用weight tying理由：入口的初始维度信息和最后输出的维度信息，虽然大小一致，但是所代表的意义不一样，我觉得完全无法匹对
         #self.lm_head.weight = self.tok_embeddings.weight
 
+        # 🌟 初始化逻辑被完全隔离到了专门的类中
+        initializer = ParamInitializer(
+            num_layers=config.layer_num,
+            std=0.02
+        )
+        initializer.initialize(self)  # 把自己交出去进行初始化
+
 
 
     def forward(self, input_ids: torch.Tensor, kv_cache_batch:KvCacheBatch = None, batch_seq_ids = None, position_ids: torch.Tensor = None):
@@ -47,14 +55,14 @@ class AnguModel(nn.Module):
             if kv_cache_batch is not None and batch_seq_ids is not None:
                 past_seq_lens = kv_cache_batch.get_kv_cache(0).get_seq_len_for_kv_cache(batch_seq_ids)
                 past_seq_len = past_seq_lens[0] if len(past_seq_lens) > 0 else 0
-            
+
             # 生成标准的连续号码牌，例如 [10, 11, 12...]
             # 形状: [batch_size, seq_len]
             position_ids = torch.arange(
-                past_seq_len, past_seq_len + seq_len, 
+                past_seq_len, past_seq_len + seq_len,
                 dtype=torch.long, device=input_ids.device
             ).unsqueeze(0).expand(batch_size, -1)
-        
+
         x = self.tok_embeddings(input_ids)
         x, total_aux_loss = self.swiGluLayer(x, kv_cache_batch, batch_seq_ids, position_ids)
         return self.lm_head(self.lm_norm(x)), total_aux_loss
@@ -79,7 +87,7 @@ class SwiGluLayer(nn.Module):
         # ---------------------------------------------------------
         # 不再查询 KV Cache！我们直接看号码牌里最大的数字是多少
         max_pos = position_ids.max().item() + 1
-        full_cos, full_sin = self.rope(max_pos) # [max_pos, head_dim/2]
+        full_cos, full_sin = self.rope(max_pos, x.device) # [max_pos, head_dim/2]
 
         # 像查字典（Embedding）一样，直接用号码牌把对应的 cos 和 sin 拔出来！
         # 结果 cos 的形状是：[batch, seq_len, head_dim/2]
