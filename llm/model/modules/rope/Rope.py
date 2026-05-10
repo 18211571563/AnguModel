@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from llm.model.layer.rope.YaRNScaler import YaRNScaler
+from llm.model.modules.rope.YaRNScaler import YaRNScaler
 
 # ---------------------------------------------------------
 # 全新封装】RoPE 位置编码类

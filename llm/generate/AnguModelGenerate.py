@@ -6,7 +6,7 @@ from transformers import GPTNeoXTokenizer
 from llm.model.AnguModel import AnguModel
 from llm.generate.TokenGenerateStrategy import TokenGenerateStrategy
 from llm.model.config.ModelConfig import ModelConfig
-from llm.model.layer.KvCache import KvCacheBatch
+from llm.model.modules.KvCache import KvCacheBatch
 import yaml
 
 

@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from llm.model.layer.RMSNorm import RMSNorm
+from llm.model.modules.RMSNorm import RMSNorm
 from torch.nn.attention import sdpa_kernel, SDPBackend
-from llm.model.layer.rope.Rope import RotaryEmbedding
-from llm.model.layer.KvCache import KvCache
+from llm.model.modules.rope.Rope import RotaryEmbedding
+from llm.model.modules.KvCache import KvCache
 import math
 
 

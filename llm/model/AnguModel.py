@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from llm.model.layer.KvCache import KvCacheBatch
-from llm.model.layer.MoeSwiGlu import MoeSwiGlu
-from llm.model.layer.RMSNorm import RMSNorm
-from llm.model.layer.Attention import Attention
-from llm.model.layer.rope.Rope import RotaryEmbedding
+from llm.model.modules.KvCache import KvCacheBatch
+from llm.model.modules.MoeSwiGlu import MoeSwiGlu
+from llm.model.modules.RMSNorm import RMSNorm
+from llm.model.modules.Attention import Attention
+from llm.model.modules.rope.Rope import RotaryEmbedding
 from llm.model.config.ModelConfig import ModelConfig
 from llm.model.init.ParamInitializer import ParamInitializer
 
