@@ -7,7 +7,7 @@ from llm.model.layer.MoeSwiGlu import MoeSwiGlu
 from llm.model.layer.RMSNorm import RMSNorm
 from llm.model.layer.Attention import Attention
 from llm.model.layer.rope.Rope import RotaryEmbedding
-from llm.common.config.ModelConfig import ModelConfig
+from llm.model.config.ModelConfig import ModelConfig
 from llm.model.init.ParamInitializer import ParamInitializer
 
 
@@ -17,16 +17,7 @@ class AnguModel(nn.Module):
         self.config = config
         self.tok_embeddings = nn.Embedding(self.config.vocab_size, self.config.dim)
 
-        self.swiGluLayer = SwiGluLayer(
-            self.config.dim,
-            self.config.hidden_dim,
-            self.config.layer_num,
-            self.config.head_num,
-            self.config.expert_num,
-            self.config.shared_num,
-            self.config.top_k,
-            self.config.max_seq_len
-        )
+        self.swiGluLayer = SwiGluLayer(config)
 
         self.lm_head = nn.Linear(self.config.dim, self.config.vocab_size, bias=False)
         self.lm_norm = RMSNorm(self.config.dim)
@@ -69,14 +60,14 @@ class AnguModel(nn.Module):
 
 
 class SwiGluLayer(nn.Module):
-    def __init__(self, dim, hidden_dim, layer_num, head_num, expert_num, shared_num, top_k, max_seq_len):
+    def __init__(self, config: ModelConfig):
         super().__init__()
 
         # 实例化 RoPE 类
-        self.rope = RotaryEmbedding(dim // head_num, max_seq_len)
+        self.rope = RotaryEmbedding(config.dim // config.head_num, config.max_seq_len)
 
         self.layers = nn.ModuleList([
-            SwiGluBlock(dim, hidden_dim, head_num, expert_num, shared_num, top_k) for _ in range(layer_num)
+            SwiGluBlock(config) for _ in range(config.layer_num)
         ])
 
     def forward(self, x, kv_cache_batch:KvCacheBatch, batch_seq_ids, position_ids: torch.Tensor = None):
@@ -126,12 +117,12 @@ class SwiGluLayer(nn.Module):
 
 
 class SwiGluBlock(nn.Module):
-    def __init__(self, dim, hidden_dim, head_num, expert_num, shared_num, top_k):
+    def __init__(self, config: ModelConfig):
         super().__init__()
-        self.norm_attention = RMSNorm(dim)
-        self.self_attention = Attention(dim, head_num)
-        self.norm = RMSNorm(dim)
-        self.swig = MoeSwiGlu(dim, hidden_dim, expert_num, shared_num, top_k)
+        self.norm_attention = RMSNorm(config.dim)
+        self.self_attention = Attention(config.dim, config.head_num)
+        self.norm = RMSNorm(config.dim)
+        self.swig = MoeSwiGlu(config.dim, config.hidden_dim, config.expert_num, config.shared_num, config.top_k)
 
     def forward(self, x, cos, sin, kv_cache, batch_seq_ids):
         x_attention = self.self_attention(self.norm_attention(x), cos, sin, kv_cache, batch_seq_ids)

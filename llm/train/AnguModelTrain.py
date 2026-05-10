@@ -4,15 +4,14 @@ import os
 os.environ["TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL"] = "1" # 指定使用
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from transformers import AutoTokenizer
 from transformers import PreTrainedTokenizerFast
 from llm.model.AnguModel import AnguModel
-from llm.common.TinyStoriesDataSetProcess import TinyStoriesDataSetProcess
+from llm.train.TinyStoriesDataLoader import TinyStoriesDataSetProcess
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from llm.common.config.ModelConfig import ModelConfig
+from llm.model.config.ModelConfig import ModelConfig
 import yaml
 from transformers import get_cosine_schedule_with_warmup
 
