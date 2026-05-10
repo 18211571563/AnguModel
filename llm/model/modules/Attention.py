@@ -5,24 +5,30 @@ from llm.model.modules.RMSNorm import RMSNorm
 from torch.nn.attention import sdpa_kernel, SDPBackend
 from llm.model.modules.rope.Rope import RotaryEmbedding
 from llm.model.modules.KvCache import KvCache
+from llm.model.config.ModelConfig import ModelConfig
 import math
 
 
 class Attention(nn.Module):
-    def __init__(self, dim, head_num, qk_norm = True, kv_group_num = 4):
+    def __init__(self, config: ModelConfig):
         super().__init__()
-        self.head_dim = dim // head_num     # 计算每头有多少dim
-        self.head_num = head_num            # 有多少头
-        self.kv_group_num = kv_group_num    # 一个q对应多少个KV
-        self.kv_head_num = head_num // kv_group_num # kv有多少头
+        self.head_dim = config.dim // config.head_num     # 计算每头有多少dim
+        self.head_num = config.head_num            # 有多少头
+        self.kv_group_num = config.kv_group_num    # 一个q对应多少个KV
+        self.kv_head_num = config.head_num // config.kv_group_num # kv有多少头
 
-        self.q_proj = nn.Linear(dim, dim, bias=False)
-        self.k_proj = nn.Linear(dim, self.kv_head_num * self.head_dim, bias=False)
-        self.v_proj = nn.Linear(dim, self.kv_head_num * self.head_dim, bias=False)
-        self.o_proj = nn.Linear(dim, dim, bias=False)
+        # 核心：根据层号决定这层是 Global 还是 SWA
+        # 比如：偶数层是全局，奇数层是 SWA
+        self.is_swa = (config.layer_num % 2 != 0)
+        self.window_size = config.sliding_window_size if self.is_swa else None
 
-        self.q_norm = RMSNorm(self.head_dim) if qk_norm else nn.Identity()
-        self.k_norm = RMSNorm(self.head_dim) if qk_norm else nn.Identity()
+        self.q_proj = nn.Linear(config.dim, config.dim, bias=False)
+        self.k_proj = nn.Linear(config.dim, self.kv_head_num * self.head_dim, bias=False)
+        self.v_proj = nn.Linear(config.dim, self.kv_head_num * self.head_dim, bias=False)
+        self.o_proj = nn.Linear(config.dim, config.dim, bias=False)
+
+        self.q_norm = RMSNorm(self.head_dim) if config.qk_norm else nn.Identity()
+        self.k_norm = RMSNorm(self.head_dim) if config.qk_norm else nn.Identity()
 
     def forward(self, x, cos, sin, kv_cache:KvCache = None, batch_seq_ids=None):
         batch_size, seq_len, dim = x.shape
@@ -69,8 +75,7 @@ class Attention(nn.Module):
                     context = F.scaled_dot_product_attention(q, k, v, scale=scale_factor, is_causal=True)
             else:
                 # 💥 长度不一样！必须手写长方形 Mask 喂给 math 后端，FlashAttention 处理不了长方形的 causal
-                mask = torch.full((seq_len, kv_seq_len), float('-inf'), device=x.device)
-                mask = torch.triu(mask, diagonal=kv_seq_len - seq_len + 1)
+                mask = self._create_attention_mask(seq_len, kv_seq_len, x.device)
 
                 # ⚠️ 注意：带有自定义 Mask 时，很多老版本的 FlashAttention 不支持，会退化到 MATH
                 with sdpa_kernel([SDPBackend.MATH]):
@@ -105,6 +110,31 @@ class Attention(nn.Module):
         context = context.transpose(1, 2).contiguous().view(batch_size, seq_len, dim)
         return self.o_proj(context)
 
+
+    def _create_attention_mask(self, seq_len, kv_seq_len, device):
+        mask = torch.full((seq_len, kv_seq_len), float('-inf'), device=device)
+        mask = torch.triu(mask, diagonal=kv_seq_len - seq_len + 1)
+
+        # swa 正方形才这样处理，不过不合适了
+        #if self.is_swa and self.window_size is not None:
+        #    swa_mask = torch.tril(torch.ones(seq_len, kv_seq_len, device=device), diagonal=-self.window_size).bool()
+        #    mask.masked_fill_(swa_mask, float('-inf'))
+
+        # 2. 长方形下绝对安全的 SWA Mask
+        if self.is_swa and self.window_size is not None:
+            # 建立 Q 和 K 的绝对物理位置索引
+            # K 的位置: [0, 1, 2, ..., kv_seq_len-1]
+            k_positions = torch.arange(kv_seq_len, device=device).view(1, -1)
+            # Q 的位置: [kv_seq_len - seq_len, ..., kv_seq_len-1]
+            # 把它变成列向量，方便广播相减
+            q_positions = torch.arange(kv_seq_len - seq_len, kv_seq_len, device=device).view(-1, 1)
+            # 距离 = 当前词位置 - 历史词位置
+            distance = q_positions - k_positions
+            # 当距离大于等于窗口大小，就是远古历史，必须屏蔽！
+            swa_mask = distance >= self.window_size
+            mask.masked_fill_(swa_mask, float('-inf'))
+
+        return mask
 
 
     @staticmethod

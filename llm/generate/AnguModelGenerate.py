@@ -119,8 +119,8 @@ for step in range(61):
 
         logits, _ = model(generate_token_id, kv_cache_batch, batch_seq_ids, position_ids)  # [batch, seq_len, vocab_size]
         last_step_logits = logits[:, -1, :]                 # [batch, vocab_size] 取出seq_len最后(-1)一组数据
-        print("last_step_logits.shape:", last_step_logits.shape)
-        # token处理 -> 主要基于模型计算出来的每行对应的下个词的概率信息，如何取下个词
+
+
         next_tokens = TokenGenerateStrategy.process_temperature_and_top_p(last_step_logits, temperature, top_p)
 
         # 连续生成长句子处理

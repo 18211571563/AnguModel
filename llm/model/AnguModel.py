@@ -120,7 +120,7 @@ class SwiGluBlock(nn.Module):
     def __init__(self, config: ModelConfig):
         super().__init__()
         self.norm_attention = RMSNorm(config.dim)
-        self.self_attention = Attention(config.dim, config.head_num)
+        self.self_attention = Attention(config)
         self.norm = RMSNorm(config.dim)
         self.swig = MoeSwiGlu(config.dim, config.hidden_dim, config.expert_num, config.shared_num, config.top_k)
 

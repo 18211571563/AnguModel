@@ -15,6 +15,11 @@ class ModelConfig:
         self.pad_token_id = 0
         self.eos_token_id = 2
 
+        # Attention
+        self.qk_norm = True
+        self.kv_group_num = 4
+        self.sliding_window_size = 1000
+
         # MoE 专属参数
         self.expert_num = 8
         self.shared_num = 1
